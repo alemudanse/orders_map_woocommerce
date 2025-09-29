@@ -20,6 +20,17 @@ function wom_render_orders_map_widget() {
 	$provider = isset( $opts['map_provider'] ) ? $opts['map_provider'] : 'osm';
 	$maps_api_key = isset( $opts['maps_api_key'] ) ? $opts['maps_api_key'] : '';
 
+	// Capability check: show a friendly message instead of an empty widget
+	if ( ! current_user_can( 'wom_manage_assignments' ) ) {
+		echo '<div class="notice notice-warning" style="margin:0"><p>' . esc_html__( 'You do not have permission to view the Orders Map.', 'woocommerce-orders-map' ) . '</p></div>';
+		return;
+	}
+
+	// Provider fallback: if Google is selected but no key, fall back to OSM
+	if ( 'google' === $provider && empty( $maps_api_key ) ) {
+		$provider = 'osm';
+	}
+
 	if ( 'google' === $provider ) {
 		// Google Maps JS API
 		$gmaps_url = add_query_arg( array(
@@ -52,6 +63,29 @@ function wom_render_orders_map_widget() {
 
 	// Container
 	echo '<div id="' . esc_attr( $map_id ) . '" style="height:240px"></div>';
+}
+
+// Also expose the map via a WooCommerce submenu page for easier discovery
+add_action( 'admin_menu', function () {
+	add_submenu_page(
+		'woocommerce',
+		__( 'Orders Map', 'woocommerce-orders-map' ),
+		__( 'Orders Map', 'woocommerce-orders-map' ),
+		'wom_manage_assignments',
+		'wom-orders-map',
+		'wom_render_orders_map_admin_page'
+	);
+} );
+
+function wom_render_orders_map_admin_page() {
+	if ( ! current_user_can( 'wom_manage_assignments' ) ) {
+		wp_die( esc_html__( 'You do not have permission to view this page.', 'woocommerce-orders-map' ) );
+	}
+	echo '<div class="wrap">';
+	echo '<h1>' . esc_html__( 'Orders Map', 'woocommerce-orders-map' ) . '</h1>';
+	// Reuse the same renderer used by the dashboard widget
+	wom_render_orders_map_widget();
+	echo '</div>';
 }
 
 // Simple REST endpoint to fetch recent orders with basic location info

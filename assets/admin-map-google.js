@@ -14,7 +14,7 @@
 			url.searchParams.set('bounds[north]', b.getNorthEast().lat());
 			url.searchParams.set('bounds[east]', b.getNorthEast().lng());
 			fetch(url.toString(), { headers: { 'X-WP-Nonce': WOM_AdminMap.nonce }, credentials: 'same-origin' })
-				.then(function(r){ return r.json(); })
+				.then(function(r){ if(!r.ok){ throw new Error('Request failed: ' + r.status); } return r.json(); })
 				.then(function(points){
 					markers.forEach(function(m){ m.setMap(null); }); markers=[]; selection.clear(); updateToolbar();
 					var bounds = new google.maps.LatLngBounds();
@@ -24,6 +24,16 @@
 						markers.push(m); bounds.extend(m.getPosition());
 					});
 					if(!bounds.isEmpty()) map.fitBounds(bounds);
+				})
+				.catch(function(err){
+					var bar = document.getElementById('wom-admin-toolbar');
+					if(!bar){ updateToolbar(); bar = document.getElementById('wom-admin-toolbar'); }
+					if(bar){
+						var msg = document.createElement('div');
+						msg.style.color = '#b32d2e';
+						msg.textContent = 'Could not load orders for map (' + (err && err.message ? err.message : 'unknown error') + ').';
+						bar.appendChild(msg);
+					}
 				});
 		}
 
