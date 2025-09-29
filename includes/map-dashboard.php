@@ -94,12 +94,13 @@ add_action( 'rest_api_init', function () {
 		'methods'             => WP_REST_Server::READABLE,
 		'permission_callback' => function () { return current_user_can( 'wom_manage_assignments' ); },
 		'callback'            => function ( WP_REST_Request $request ) {
-            $bounds = $request->get_param( 'bounds' ); // {south,west,north,east}
-            $limit  = min( 200, max( 1, absint( $request->get_param( 'limit' ) ) ) );
+			$bounds = $request->get_param( 'bounds' ); // {south,west,north,east}
+			$limit  = min( 200, max( 1, absint( $request->get_param( 'limit' ) ) ) );
+			$live   = (bool) $request->get_param( 'live' );
 
-            $cache_key = 'wom_map_feed_' . md5( wp_json_encode( array( 'b' => $bounds, 'l' => $limit ) ) );
-            $cached    = get_transient( $cache_key );
-            if ( $cached ) { return new WP_REST_Response( $cached, 200 ); }
+			$cache_key = 'wom_map_feed_' . md5( wp_json_encode( array( 'b' => $bounds, 'l' => $limit ) ) );
+			$cached    = $live ? false : get_transient( $cache_key );
+			if ( $cached ) { return new WP_REST_Response( $cached, 200 ); }
 
             $orders = wc_get_orders( array(
                 'limit'   => $limit,
@@ -130,9 +131,18 @@ add_action( 'rest_api_init', function () {
 					'address' => wc_format_address( $order->get_address( 'shipping' ) ),
 					'status'  => $order->get_status(),
 					'assignedDriver' => (int) get_post_meta( $order_id, WOM_META_ASSIGNED_DRIVER, true ),
+					// Live positions (if available)
+					'driverLat' => (float) get_post_meta( $order_id, WOM_META_DRIVER_LAT, true ),
+					'driverLng' => (float) get_post_meta( $order_id, WOM_META_DRIVER_LNG, true ),
+					'driverLocAt' => (int) get_post_meta( $order_id, WOM_META_DRIVER_LOC_AT, true ),
+					'customerLat' => (float) get_post_meta( $order_id, WOM_META_CUSTOMER_LAT, true ),
+					'customerLng' => (float) get_post_meta( $order_id, WOM_META_CUSTOMER_LNG, true ),
+					'customerLocAt' => (int) get_post_meta( $order_id, WOM_META_CUSTOMER_LOC_AT, true ),
 				);
 			}
-            set_transient( $cache_key, $data, MINUTE_IN_SECONDS );
+			if ( ! $live ) {
+				set_transient( $cache_key, $data, 10 );
+			}
             return new WP_REST_Response( $data, 200 );
 		},
 	) );

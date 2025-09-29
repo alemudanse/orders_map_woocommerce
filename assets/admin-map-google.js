@@ -13,15 +13,24 @@
 			url.searchParams.set('bounds[west]', b.getSouthWest().lng());
 			url.searchParams.set('bounds[north]', b.getNorthEast().lat());
 			url.searchParams.set('bounds[east]', b.getNorthEast().lng());
+			url.searchParams.set('live', '1');
 			fetch(url.toString(), { headers: { 'X-WP-Nonce': WOM_AdminMap.nonce }, credentials: 'same-origin' })
 				.then(function(r){ if(!r.ok){ throw new Error('Request failed: ' + r.status); } return r.json(); })
 				.then(function(points){
 					markers.forEach(function(m){ m.setMap(null); }); markers=[]; selection.clear(); updateToolbar();
 					var bounds = new google.maps.LatLngBounds();
 					(points||[]).forEach(function(p){
-						var m = new google.maps.Marker({ position: { lat: p.lat, lng: p.lng }, map: map });
+						var m = new google.maps.Marker({ position: { lat: p.lat, lng: p.lng }, map: map, title: 'Order #' + p.number });
 						m.addListener('click', function(){ toggleSelect(p.id, m); });
 						markers.push(m); bounds.extend(m.getPosition());
+						if(p.driverLat && p.driverLng){
+							var dm = new google.maps.Marker({ position: { lat: p.driverLat, lng: p.driverLng }, map: map, icon: { path: google.maps.SymbolPath.CIRCLE, scale: 6, fillColor: '#2684ff', fillOpacity: 1, strokeColor: '#0052cc', strokeWeight: 1 }, title: 'Driver for #' + p.number });
+							markers.push(dm); bounds.extend(dm.getPosition());
+						}
+						if(p.customerLat && p.customerLng){
+							var cm = new google.maps.Marker({ position: { lat: p.customerLat, lng: p.customerLng }, map: map, icon: { path: google.maps.SymbolPath.CIRCLE, scale: 6, fillColor: '#34a853', fillOpacity: 1, strokeColor: '#137333', strokeWeight: 1 }, title: 'Customer for #' + p.number });
+							markers.push(cm); bounds.extend(cm.getPosition());
+						}
 					});
 					if(!bounds.isEmpty()) map.fitBounds(bounds);
 				})
@@ -36,6 +45,9 @@
 					}
 				});
 		}
+
+		// Periodically refresh for live positions
+		setInterval(loadPoints, 20000);
 
 		function toggleSelect(id, m){
 			if(selection.has(id)) { selection.delete(id); m.setOpacity(1); }
