@@ -5,6 +5,7 @@
 		var map = new google.maps.Map(el, { center: { lat: 51.505, lng: -0.09 }, zoom: 11 });
 		var selection = new Set();
 		var markers = [];
+		var storeMarker = null;
 
 		function loadPoints(){
 			var b = map.getBounds(); if(!b) { setTimeout(loadPoints, 200); return; }
@@ -79,6 +80,11 @@
 
 		map.addListener('idle', loadPoints);
 		loadPoints();
+
+		// Load store marker once
+		fetch(WOM_AdminMap.root + '/admin/store-location', { headers: { 'X-WP-Nonce': WOM_AdminMap.nonce }, credentials: 'same-origin' })
+			.then(function(r){ if(!r.ok){ return null; } return r.json(); })
+			.then(function(s){ if(!s || !s.lat){ return; } if(storeMarker){ storeMarker.setMap(null); } storeMarker = new google.maps.Marker({ position: { lat: s.lat, lng: s.lng }, map: map, label: 'S', title: 'Store: ' + (s.address||'') }); });
 	}
 	if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
 	else init();

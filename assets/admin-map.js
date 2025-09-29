@@ -10,6 +10,7 @@
 
 		var selection = new Set();
 		var markers = [];
+		var storeMarker = null;
 
 		function loadPoints(){
 			var b = map.getBounds();
@@ -107,6 +108,11 @@
 
 		map.on('moveend', loadPoints);
 		loadPoints();
+
+		// Load store marker once
+		fetch(WOM_AdminMap.root + '/admin/store-location', { headers: { 'X-WP-Nonce': WOM_AdminMap.nonce }, credentials: 'same-origin' })
+			.then(function(r){ if(!r.ok){ return null; } return r.json(); })
+			.then(function(s){ if(!s || !s.lat){ return; } if(storeMarker){ map.removeLayer(storeMarker); } storeMarker = L.marker([s.lat, s.lng], { title: 'Store' }).addTo(map).bindPopup('Store: ' + (s.address||'')); });
 	}
 	if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
 	else init();

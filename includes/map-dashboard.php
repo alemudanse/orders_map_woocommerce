@@ -188,4 +188,31 @@ add_action( 'rest_api_init', function () {
 			return new WP_REST_Response( array( 'ok' => true ), 200 );
 		},
 	) );
+
+	// Store location endpoint for admin map
+	register_rest_route( 'wom/v1', '/admin/store-location', array(
+		'methods'             => WP_REST_Server::READABLE,
+		'permission_callback' => function () { return current_user_can( 'wom_manage_assignments' ); },
+		'callback'            => function () {
+			$base_country = get_option( 'woocommerce_default_country' ); // e.g. GB:London
+			$store_addr1  = get_option( 'woocommerce_store_address' );
+			$store_addr2  = get_option( 'woocommerce_store_address_2' );
+			$store_city   = get_option( 'woocommerce_store_city' );
+			$store_post   = get_option( 'woocommerce_store_postcode' );
+			$country      = '';
+			$state        = '';
+			if ( strpos( (string) $base_country, ':' ) !== false ) {
+				list( $country, $state ) = array_pad( explode( ':', (string) $base_country ), 2, '' );
+			} else {
+				$country = (string) $base_country;
+			}
+			$parts = array_filter( array( (string) $store_addr1, (string) $store_addr2, (string) $store_city, (string) $state, (string) $store_post, (string) $country ) );
+			$address = implode( ', ', $parts );
+			$coords  = function_exists( 'wom_geocode_address' ) && ! empty( $address ) ? wom_geocode_address( $address ) : null;
+			if ( $coords ) {
+				return new WP_REST_Response( array( 'lat' => (float) $coords['lat'], 'lng' => (float) $coords['lng'], 'address' => $address ), 200 );
+			}
+			return new WP_REST_Response( array(), 200 );
+		},
+	) );
 } );
