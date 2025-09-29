@@ -32,7 +32,8 @@
 					var bounds = [];
 					(points || []).forEach(function(p){
 						var marker = L.marker([p.lat, p.lng], { title: 'Order #' + p.number }).addTo(map);
-						marker.bindPopup('<strong>Order #' + p.number + '</strong><br>' + (p.address||'') + '<br>Status: ' + p.status + '<br>Driver: ' + (p.assignedDriver||'-'));
+						var gnav = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(p.lat + ',' + p.lng);
+						marker.bindPopup('<strong>Order #' + p.number + '</strong><br>' + (p.address||'') + '<br>Status: ' + p.status + '<br>Driver: ' + (p.assignedDriver||'-') + '<br><a href="' + gnav + '" target="_blank" rel="noopener">Navigate</a>');
 						marker.on('click', function(){ toggleSelect(p.id, marker); });
 						marker._orderId = p.id;
 						markers.push(marker);

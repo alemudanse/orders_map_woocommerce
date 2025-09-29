@@ -99,6 +99,7 @@ function shareDriverLocation(orderId){
 					el('div', { className: 'wom-line', text: 'Order #' + o.number + ' — ' + (o.driverStatus || 'assigned') }),
 					el('div', { className: 'wom-line', text: (o.customer && o.customer.name) ? o.customer.name : '' }),
 					el('div', { className: 'wom-line', text: address(o) }),
+					el('div', { className: 'wom-line' }, [ navLink(o) ]),
 					actions,
 					pod,
 					loc
@@ -114,6 +115,14 @@ function shareDriverLocation(orderId){
 		function address(o) {
 			var s = o.shipping || {};
 			return [s.address1, s.address2, s.city, s.postcode, s.country].filter(Boolean).join(', ');
+		}
+
+		function navLink(o){
+			if(!o) return null;
+			var addr = [ (o.shipping&&o.shipping.address1)||'', (o.shipping&&o.shipping.city)||'', (o.shipping&&o.shipping.postcode)||'', (o.shipping&&o.shipping.country)||'' ].filter(Boolean).join(' ');
+			var gnav = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(addr);
+			var a = el('a', { href: gnav, target: '_blank', rel: 'noopener' }, [ el('span', { text: 'Navigate' }) ]);
+			return a;
 		}
 
 		function button(label, onClick) {

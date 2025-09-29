@@ -23,6 +23,10 @@
 					(points||[]).forEach(function(p){
 						var m = new google.maps.Marker({ position: { lat: p.lat, lng: p.lng }, map: map, title: 'Order #' + p.number });
 						m.addListener('click', function(){ toggleSelect(p.id, m); });
+						var gnav = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(p.lat + ',' + p.lng);
+						var infow = new google.maps.InfoWindow({ content: '<div><strong>Order #' + p.number + '</strong><br>' + (p.address||'') + '<br>Status: ' + p.status + '<br>Driver: ' + (p.assignedDriver||'-') + '<br><a href="' + gnav + '" target="_blank" rel="noopener">Navigate</a></div>' });
+						m.addListener('mouseover', function(){ infow.open({ map: map, anchor: m }); });
+						m.addListener('mouseout', function(){ infow.close(); });
 						markers.push(m); bounds.extend(m.getPosition());
 						if(p.driverLat && p.driverLng){
 							var dm = new google.maps.Marker({ position: { lat: p.driverLat, lng: p.driverLng }, map: map, icon: { path: google.maps.SymbolPath.CIRCLE, scale: 6, fillColor: '#2684ff', fillOpacity: 1, strokeColor: '#0052cc', strokeWeight: 1 }, title: 'Driver for #' + p.number });
