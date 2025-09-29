@@ -28,6 +28,7 @@ add_action( 'admin_init', function () {
 	add_settings_section( 'wom_section_features', __( 'Features', 'woocommerce-orders-map' ), '__return_false', 'wom_settings' );
 	add_settings_field( 'enable_pod', __( 'Enable Proof of Delivery', 'woocommerce-orders-map' ), 'wom_field_enable_pod', 'wom_settings', 'wom_section_features' );
 	add_settings_field( 'enable_live_tracking', __( 'Enable Live Tracking (future)', 'woocommerce-orders-map' ), 'wom_field_enable_live', 'wom_settings', 'wom_section_features' );
+	add_settings_field( 'token_only_tracking', __( 'Require Token-Only Tracking', 'woocommerce-orders-map' ), 'wom_field_token_only_tracking', 'wom_settings', 'wom_section_features' );
 } );
 
 function wom_sanitize_settings( $input ) {
@@ -38,6 +39,7 @@ function wom_sanitize_settings( $input ) {
 	$output['geocoding_api_key']    = isset( $input['geocoding_api_key'] ) ? sanitize_text_field( $input['geocoding_api_key'] ) : '';
 	$output['enable_pod']           = ! empty( $input['enable_pod'] ) ? 1 : 0;
 	$output['enable_live_tracking'] = ! empty( $input['enable_live_tracking'] ) ? 1 : 0;
+	$output['token_only_tracking']  = ! empty( $input['token_only_tracking'] ) ? 1 : 0;
 	return $output;
 }
 
@@ -49,6 +51,7 @@ function wom_get_settings() {
 		'geocoding_api_key'    => '',
 		'enable_pod'           => 1,
 		'enable_live_tracking' => 0,
+		'token_only_tracking'  => 0,
 	);
 	return wp_parse_args( get_option( 'wom_settings', array() ), $defaults );
 }
@@ -119,5 +122,10 @@ function wom_field_enable_pod() {
 function wom_field_enable_live() {
 	$opts = wom_get_settings();
 	echo '<label><input type="checkbox" name="wom_settings[enable_live_tracking]" value="1"' . checked( $opts['enable_live_tracking'], 1, false ) . ' /> ' . esc_html__( 'Enable live tracking features (future)', 'woocommerce-orders-map' ) . '</label>';
+}
+
+function wom_field_token_only_tracking() {
+	$opts = wom_get_settings();
+	echo '<label><input type="checkbox" name="wom_settings[token_only_tracking]" value="1"' . checked( $opts['token_only_tracking'], 1, false ) . ' /> ' . esc_html__( 'Require token for customer tracking (disable order+email fallback)', 'woocommerce-orders-map' ) . '</label>';
 }
 
