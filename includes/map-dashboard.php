@@ -194,6 +194,8 @@ add_action( 'rest_api_init', function () {
 		'methods'             => WP_REST_Server::READABLE,
 		'permission_callback' => function () { return current_user_can( 'wom_manage_assignments' ); },
 		'callback'            => function () {
+			$opts = function_exists( 'wom_get_settings' ) ? wom_get_settings() : array( 'show_store_marker' => 1 );
+			if ( empty( $opts['show_store_marker'] ) ) { return new WP_REST_Response( array(), 200 ); }
 			$base_country = get_option( 'woocommerce_default_country' ); // e.g. GB:London
 			$store_addr1  = get_option( 'woocommerce_store_address' );
 			$store_addr2  = get_option( 'woocommerce_store_address_2' );

@@ -29,6 +29,7 @@ add_action( 'admin_init', function () {
 	add_settings_field( 'enable_pod', __( 'Enable Proof of Delivery', 'woocommerce-orders-map' ), 'wom_field_enable_pod', 'wom_settings', 'wom_section_features' );
 	add_settings_field( 'enable_live_tracking', __( 'Enable Live Tracking (future)', 'woocommerce-orders-map' ), 'wom_field_enable_live', 'wom_settings', 'wom_section_features' );
 	add_settings_field( 'token_only_tracking', __( 'Require Token-Only Tracking', 'woocommerce-orders-map' ), 'wom_field_token_only_tracking', 'wom_settings', 'wom_section_features' );
+	add_settings_field( 'show_store_marker', __( 'Show Store Marker on Admin Map', 'woocommerce-orders-map' ), 'wom_field_show_store_marker', 'wom_settings', 'wom_section_features' );
 } );
 
 function wom_sanitize_settings( $input ) {
@@ -40,6 +41,7 @@ function wom_sanitize_settings( $input ) {
 	$output['enable_pod']           = ! empty( $input['enable_pod'] ) ? 1 : 0;
 	$output['enable_live_tracking'] = ! empty( $input['enable_live_tracking'] ) ? 1 : 0;
 	$output['token_only_tracking']  = ! empty( $input['token_only_tracking'] ) ? 1 : 0;
+	$output['show_store_marker']    = ! empty( $input['show_store_marker'] ) ? 1 : 0;
 	return $output;
 }
 
@@ -52,6 +54,7 @@ function wom_get_settings() {
 		'enable_pod'           => 1,
 		'enable_live_tracking' => 0,
 		'token_only_tracking'  => 0,
+		'show_store_marker'    => 1,
 	);
 	return wp_parse_args( get_option( 'wom_settings', array() ), $defaults );
 }
@@ -127,5 +130,10 @@ function wom_field_enable_live() {
 function wom_field_token_only_tracking() {
 	$opts = wom_get_settings();
 	echo '<label><input type="checkbox" name="wom_settings[token_only_tracking]" value="1"' . checked( $opts['token_only_tracking'], 1, false ) . ' /> ' . esc_html__( 'Require token for customer tracking (disable order+email fallback)', 'woocommerce-orders-map' ) . '</label>';
+}
+
+function wom_field_show_store_marker() {
+	$opts = wom_get_settings();
+	echo '<label><input type="checkbox" name="wom_settings[show_store_marker]" value="1"' . checked( $opts['show_store_marker'], 1, false ) . ' /> ' . esc_html__( 'Display the store location marker on admin map', 'woocommerce-orders-map' ) . '</label>';
 }
 
