@@ -10,6 +10,7 @@
 
 		var selection = new Set();
 		var markers = [];
+		var storeMarker = null;
 
 		function loadPoints(){
 			var b = map.getBounds();
@@ -18,24 +19,55 @@
 			url.searchParams.set('bounds[west]', b.getWest());
 			url.searchParams.set('bounds[north]', b.getNorth());
 			url.searchParams.set('bounds[east]', b.getEast());
+			url.searchParams.set('live', '1');
 			return fetch(url.toString(), { headers: { 'X-WP-Nonce': WOM_AdminMap.nonce }, credentials: 'same-origin' })
-				.then(function(r){ return r.json(); })
+				.then(function(r){
+					if(!r.ok){ throw new Error('Request failed: ' + r.status); }
+					return r.json();
+				})
 				.then(function(points){
 					markers.forEach(function(m){ map.removeLayer(m); });
 					markers = [];
 					selection.clear();
 					var bounds = [];
 					(points || []).forEach(function(p){
-						var marker = L.marker([p.lat, p.lng]).addTo(map);
-						marker.bindPopup('<strong>Order #' + p.number + '</strong><br>' + (p.address||'') + '<br>Status: ' + p.status + '<br>Driver: ' + (p.assignedDriver||'-'));
+						var marker = L.marker([p.lat, p.lng], { title: 'Order #' + p.number }).addTo(map);
+						var gnav = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(p.lat + ',' + p.lng);
+						marker.bindPopup('<strong>Order #' + p.number + '</strong><br>' + (p.address||'') + '<br>Status: ' + p.status + '<br>Driver: ' + (p.assignedDriver||'-') + '<br><a href="' + gnav + '" target="_blank" rel="noopener">Navigate</a>');
 						marker.on('click', function(){ toggleSelect(p.id, marker); });
 						marker._orderId = p.id;
 						markers.push(marker);
 						bounds.push([p.lat, p.lng]);
+						// Live driver/customer markers (lighter styling)
+						if(p.driverLat && p.driverLng){
+							var d = L.circleMarker([p.driverLat, p.driverLng], { radius: 6, color: '#0052cc', fillColor: '#2684ff', fillOpacity: 0.8 });
+							d.addTo(map).bindPopup('Driver for #' + p.number);
+							markers.push(d);
+							bounds.push([p.driverLat, p.driverLng]);
+						}
+						if(p.customerLat && p.customerLng){
+							var c = L.circleMarker([p.customerLat, p.customerLng], { radius: 6, color: '#137333', fillColor: '#34a853', fillOpacity: 0.8 });
+							c.addTo(map).bindPopup('Customer for #' + p.number);
+							markers.push(c);
+							bounds.push([p.customerLat, p.customerLng]);
+						}
 					});
 					if(bounds.length) map.fitBounds(bounds, { padding: [20,20] });
+				})
+				.catch(function(err){
+					var bar = document.getElementById('wom-admin-toolbar');
+					if(!bar){ updateToolbar(); bar = document.getElementById('wom-admin-toolbar'); }
+					if(bar){
+						var msg = document.createElement('div');
+						msg.style.color = '#b32d2e';
+						msg.textContent = 'Could not load orders for map (' + (err && err.message ? err.message : 'unknown error') + ').';
+						bar.appendChild(msg);
+					}
 				});
 		}
+
+		// Periodically refresh for live positions
+		setInterval(loadPoints, 20000);
 
 		function toggleSelect(orderId, marker){
 			if(selection.has(orderId)) { selection.delete(orderId); marker.setOpacity(1); }
@@ -77,6 +109,11 @@
 
 		map.on('moveend', loadPoints);
 		loadPoints();
+
+		// Load store marker once
+		fetch(WOM_AdminMap.root + '/admin/store-location', { headers: { 'X-WP-Nonce': WOM_AdminMap.nonce }, credentials: 'same-origin' })
+			.then(function(r){ if(!r.ok){ return null; } return r.json(); })
+			.then(function(s){ if(!s || !s.lat){ return; } if(storeMarker){ map.removeLayer(storeMarker); } storeMarker = L.marker([s.lat, s.lng], { title: 'Store' }).addTo(map).bindPopup('Store: ' + (s.address||'')); });
 	}
 	if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
 	else init();

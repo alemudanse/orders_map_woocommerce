@@ -125,44 +125,48 @@ add_action( 'init', function () {
     add_shortcode( 'wom_customer_tracking', function () {
         $token = isset( $_GET['token'] ) ? sanitize_text_field( wp_unslash( $_GET['token'] ) ) : '';
         ob_start();
-        echo '<div id="wom-customer-track"></div>';
-        echo '<script>(function(){
-            var root=' . wp_json_encode( esc_url_raw( rest_url( 'wom/v1' ) ) ) . ';
-            var token=' . wp_json_encode( $token ) . ';
-            var el=document.getElementById("wom-customer-track");
-            el.innerHTML = "<div><label>Order # <input id=\\"wom-order\\"/></label> <label>Email <input id=\\"wom-email\\" type=\\"email\\"/></label> <button id=\\"wom-track\\">Track</button></div><div id=\\"wom-map\\" style=\\"height:320px;margin-top:8px\\"></div>";
-            function get(u){return fetch(u).then(function(r){return r.json();});}
-            function g(cb){if(!navigator.geolocation){cb(null);return;}navigator.geolocation.getCurrentPosition(function(p){cb({lat:p.coords.latitude,lng:p.coords.longitude});},function(){cb(null);});}
-            function post(u,d){return fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}).then(function(r){return r.json();});}
-            function renderTrack(q){
-                var url = root + "/track" + q;
-                get(url).then(function(data){
-                    if(data && data.orderId){
-                        if(typeof L !== 'undefined'){
-                            var mapEl=document.getElementById("wom-map");
-                            var map = L.map(mapEl).setView([51.505,-0.09], 12);
-                            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
-                            var markers=[];
-                            function upd(){
-                                get(url).then(function(d){
-                                    markers.forEach(function(m){map.removeLayer(m);}); markers=[];
-                                    if(d.customerLat && d.customerLng){ markers.push(L.marker([d.customerLat,d.customerLng]).addTo(map).bindPopup("Customer")); }
-                                    if(d.driverLat && d.driverLng){ markers.push(L.marker([d.driverLat,d.driverLng]).addTo(map).bindPopup("Driver")); }
-                                    var b=[]; markers.forEach(function(m){ b.push(m.getLatLng()); }); if(b.length){ map.fitBounds(b,{padding:[20,20]}); }
-                                });
-                            }
-                            upd(); setInterval(upd, 20000);
-                        }
-                    } else { alert("Not found. Check details."); }
-                });
-            }
-            document.getElementById("wom-track").addEventListener("click", function(){
-                var no = document.getElementById("wom-order").value.trim();
-                var em = document.getElementById("wom-email").value.trim();
-                renderTrack("?order="+encodeURIComponent(no)+"&email="+encodeURIComponent(em));
-            });
-            if(token){ renderTrack("?token="+encodeURIComponent(token)); }
-        })();</script>';
+		echo '<div id="wom-customer-track"></div>';
+		$root_js  = wp_json_encode( esc_url_raw( rest_url( 'wom/v1' ) ) );
+		$token_js = wp_json_encode( $token );
+		echo <<<JS
+<script>(function(){
+    var root={$root_js};
+    var token={$token_js};
+    var el=document.getElementById("wom-customer-track");
+    el.innerHTML = "<div><label>Order # <input id=\"wom-order\"/></label> <label>Email <input id=\"wom-email\" type=\"email\"/></label> <button id=\"wom-track\">Track</button></div><div id=\"wom-map\" style=\"height:320px;margin-top:8px\"></div>";
+    function get(u){return fetch(u).then(function(r){return r.json();});}
+    function g(cb){if(!navigator.geolocation){cb(null);return;}navigator.geolocation.getCurrentPosition(function(p){cb({lat:p.coords.latitude,lng:p.coords.longitude});},function(){cb(null);});}
+    function post(u,d){return fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}).then(function(r){return r.json();});}
+    function renderTrack(q){
+        var url = root + "/track" + q;
+        get(url).then(function(data){
+            if(data && data.orderId){
+                if(typeof L !== 'undefined'){
+                    var mapEl=document.getElementById("wom-map");
+                    var map = L.map(mapEl).setView([51.505,-0.09], 12);
+                    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(map);
+                    var markers=[];
+                    function upd(){
+                        get(url).then(function(d){
+                            markers.forEach(function(m){map.removeLayer(m);}); markers=[];
+                            if(d.customerLat && d.customerLng){ markers.push(L.marker([d.customerLat,d.customerLng]).addTo(map).bindPopup("Customer")); }
+                            if(d.driverLat && d.driverLng){ markers.push(L.marker([d.driverLat,d.driverLng]).addTo(map).bindPopup("Driver")); }
+                            var b=[]; markers.forEach(function(m){ b.push(m.getLatLng()); }); if(b.length){ map.fitBounds(b,{padding:[20,20]}); }
+                        });
+                    }
+                    upd(); setInterval(upd, 20000);
+                }
+            } else { alert("Not found. Check details."); }
+        });
+    }
+    document.getElementById("wom-track").addEventListener("click", function(){
+        var no = document.getElementById("wom-order").value.trim();
+        var em = document.getElementById("wom-email").value.trim();
+        renderTrack("?order="+encodeURIComponent(no)+"&email="+encodeURIComponent(em));
+    });
+    if(token){ renderTrack("?token="+encodeURIComponent(token)); }
+})();</script>
+JS;
         return ob_get_clean();
     } );
 } );

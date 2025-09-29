@@ -281,6 +281,15 @@ function wom_rest_confirm_pod_by_token( WP_REST_Request $request ) {
 		return new WP_Error( 'wom_pod_bad_token', __( 'Missing token', 'woocommerce-orders-map' ), array( 'status' => 400 ) );
 	}
 
+	// Basic rate limit by IP to protect public endpoint
+	$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( (string) $_SERVER['REMOTE_ADDR'] ) : '0.0.0.0';
+	$rl_key = 'wom_pod_confirm_rl_' . md5( $ip );
+	$rl_cnt = (int) get_transient( $rl_key );
+	if ( $rl_cnt > 60 ) {
+		return new WP_Error( 'wom_rate_limited', __( 'Too many requests. Try later.', 'woocommerce-orders-map' ), array( 'status' => 429 ) );
+	}
+	set_transient( $rl_key, $rl_cnt + 1, 10 * MINUTE_IN_SECONDS );
+
 	$q = new WP_Query( array(
 		'post_type'      => 'shop_order',
 		'posts_per_page' => 1,
@@ -308,6 +317,9 @@ function wom_rest_confirm_pod_by_token( WP_REST_Request $request ) {
 	if ( ! get_post_meta( $order_id, '_wom_delivered_at', true ) ) {
 		update_post_meta( $order_id, '_wom_delivered_at', time() );
 	}
+	// Invalidate token immediately (single-use)
+	delete_post_meta( $order_id, WOM_META_POD_TOKEN );
+	delete_post_meta( $order_id, WOM_META_POD_EXPIRES );
 	wc_create_order_note( $order_id, __( 'Customer confirmed delivery via link.', 'woocommerce-orders-map' ) );
 
 	return new WP_REST_Response( array( 'ok' => true ), 200 );

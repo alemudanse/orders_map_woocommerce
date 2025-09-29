@@ -20,6 +20,17 @@ function wom_render_orders_map_widget() {
 	$provider = isset( $opts['map_provider'] ) ? $opts['map_provider'] : 'osm';
 	$maps_api_key = isset( $opts['maps_api_key'] ) ? $opts['maps_api_key'] : '';
 
+	// Capability check: show a friendly message instead of an empty widget
+	if ( ! current_user_can( 'wom_manage_assignments' ) ) {
+		echo '<div class="notice notice-warning" style="margin:0"><p>' . esc_html__( 'You do not have permission to view the Orders Map.', 'woocommerce-orders-map' ) . '</p></div>';
+		return;
+	}
+
+	// Provider fallback: if Google is selected but no key, fall back to OSM
+	if ( 'google' === $provider && empty( $maps_api_key ) ) {
+		$provider = 'osm';
+	}
+
 	if ( 'google' === $provider ) {
 		// Google Maps JS API
 		$gmaps_url = add_query_arg( array(
@@ -54,18 +65,42 @@ function wom_render_orders_map_widget() {
 	echo '<div id="' . esc_attr( $map_id ) . '" style="height:240px"></div>';
 }
 
+// Also expose the map via a WooCommerce submenu page for easier discovery
+add_action( 'admin_menu', function () {
+	add_submenu_page(
+		'woocommerce',
+		__( 'Orders Map', 'woocommerce-orders-map' ),
+		__( 'Orders Map', 'woocommerce-orders-map' ),
+		'wom_manage_assignments',
+		'wom-orders-map',
+		'wom_render_orders_map_admin_page'
+	);
+} );
+
+function wom_render_orders_map_admin_page() {
+	if ( ! current_user_can( 'wom_manage_assignments' ) ) {
+		wp_die( esc_html__( 'You do not have permission to view this page.', 'woocommerce-orders-map' ) );
+	}
+	echo '<div class="wrap">';
+	echo '<h1>' . esc_html__( 'Orders Map', 'woocommerce-orders-map' ) . '</h1>';
+	// Reuse the same renderer used by the dashboard widget
+	wom_render_orders_map_widget();
+	echo '</div>';
+}
+
 // Simple REST endpoint to fetch recent orders with basic location info
 add_action( 'rest_api_init', function () {
     register_rest_route( 'wom/v1', '/admin/orders-for-map', array(
 		'methods'             => WP_REST_Server::READABLE,
 		'permission_callback' => function () { return current_user_can( 'wom_manage_assignments' ); },
 		'callback'            => function ( WP_REST_Request $request ) {
-            $bounds = $request->get_param( 'bounds' ); // {south,west,north,east}
-            $limit  = min( 200, max( 1, absint( $request->get_param( 'limit' ) ) ) );
+			$bounds = $request->get_param( 'bounds' ); // {south,west,north,east}
+			$limit  = min( 200, max( 1, absint( $request->get_param( 'limit' ) ) ) );
+			$live   = (bool) $request->get_param( 'live' );
 
-            $cache_key = 'wom_map_feed_' . md5( wp_json_encode( array( 'b' => $bounds, 'l' => $limit ) ) );
-            $cached    = get_transient( $cache_key );
-            if ( $cached ) { return new WP_REST_Response( $cached, 200 ); }
+			$cache_key = 'wom_map_feed_' . md5( wp_json_encode( array( 'b' => $bounds, 'l' => $limit ) ) );
+			$cached    = $live ? false : get_transient( $cache_key );
+			if ( $cached ) { return new WP_REST_Response( $cached, 200 ); }
 
             $orders = wc_get_orders( array(
                 'limit'   => $limit,
@@ -96,9 +131,18 @@ add_action( 'rest_api_init', function () {
 					'address' => wc_format_address( $order->get_address( 'shipping' ) ),
 					'status'  => $order->get_status(),
 					'assignedDriver' => (int) get_post_meta( $order_id, WOM_META_ASSIGNED_DRIVER, true ),
+					// Live positions (if available)
+					'driverLat' => (float) get_post_meta( $order_id, WOM_META_DRIVER_LAT, true ),
+					'driverLng' => (float) get_post_meta( $order_id, WOM_META_DRIVER_LNG, true ),
+					'driverLocAt' => (int) get_post_meta( $order_id, WOM_META_DRIVER_LOC_AT, true ),
+					'customerLat' => (float) get_post_meta( $order_id, WOM_META_CUSTOMER_LAT, true ),
+					'customerLng' => (float) get_post_meta( $order_id, WOM_META_CUSTOMER_LNG, true ),
+					'customerLocAt' => (int) get_post_meta( $order_id, WOM_META_CUSTOMER_LOC_AT, true ),
 				);
 			}
-            set_transient( $cache_key, $data, MINUTE_IN_SECONDS );
+			if ( ! $live ) {
+				set_transient( $cache_key, $data, 10 );
+			}
             return new WP_REST_Response( $data, 200 );
 		},
 	) );
@@ -142,6 +186,35 @@ add_action( 'rest_api_init', function () {
 			}
             global $wpdb; $wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_wom_map_feed_%' OR option_name LIKE '_transient_timeout_wom_map_feed_%'" );
 			return new WP_REST_Response( array( 'ok' => true ), 200 );
+		},
+	) );
+
+	// Store location endpoint for admin map
+	register_rest_route( 'wom/v1', '/admin/store-location', array(
+		'methods'             => WP_REST_Server::READABLE,
+		'permission_callback' => function () { return current_user_can( 'wom_manage_assignments' ); },
+		'callback'            => function () {
+			$opts = function_exists( 'wom_get_settings' ) ? wom_get_settings() : array( 'show_store_marker' => 1 );
+			if ( empty( $opts['show_store_marker'] ) ) { return new WP_REST_Response( array(), 200 ); }
+			$base_country = get_option( 'woocommerce_default_country' ); // e.g. GB:London
+			$store_addr1  = get_option( 'woocommerce_store_address' );
+			$store_addr2  = get_option( 'woocommerce_store_address_2' );
+			$store_city   = get_option( 'woocommerce_store_city' );
+			$store_post   = get_option( 'woocommerce_store_postcode' );
+			$country      = '';
+			$state        = '';
+			if ( strpos( (string) $base_country, ':' ) !== false ) {
+				list( $country, $state ) = array_pad( explode( ':', (string) $base_country ), 2, '' );
+			} else {
+				$country = (string) $base_country;
+			}
+			$parts = array_filter( array( (string) $store_addr1, (string) $store_addr2, (string) $store_city, (string) $state, (string) $store_post, (string) $country ) );
+			$address = implode( ', ', $parts );
+			$coords  = function_exists( 'wom_geocode_address' ) && ! empty( $address ) ? wom_geocode_address( $address ) : null;
+			if ( $coords ) {
+				return new WP_REST_Response( array( 'lat' => (float) $coords['lat'], 'lng' => (float) $coords['lng'], 'address' => $address ), 200 );
+			}
+			return new WP_REST_Response( array(), 200 );
 		},
 	) );
 } );
